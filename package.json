@@ -5,10 +5,20 @@
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "lint": "vue-cli-service lint",
+    "electron:build": "vue-cli-service electron:build",
+    "win": "vue-cli-service electron:build --windows --x64",
+    "electron:serve": "vue-cli-service electron:serve",
+    "postinstall": "electron-builder install-app-deps",
+    "postuninstall": "electron-builder install-app-deps"
   },
+  "main": "background.js",
   "dependencies": {
     "core-js": "^3.6.5",
+    "electron-store": "^8.0.0",
+    "exceljs": "^4.2.1",
+    "lodash": "^4.17.21",
+    "node-xlsx": "^0.16.1",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",
     "vue-property-decorator": "^9.1.2",
@@ -16,14 +26,24 @@
     "vuex": "^3.4.0"
   },
   "devDependencies": {
+    "@types/electron-devtools-installer": "^2.2.0",
+    "@types/lodash": "^4.14.169",
+    "@types/node-xlsx": "^0.15.1",
     "@vue/cli-plugin-babel": "~4.5.0",
     "@vue/cli-plugin-router": "~4.5.0",
     "@vue/cli-plugin-typescript": "~4.5.0",
     "@vue/cli-plugin-vuex": "~4.5.0",
     "@vue/cli-service": "~4.5.0",
+    "electron": "^12.0.0",
+    "electron-devtools-installer": "^3.1.0",
+    "electron-packager": "^15.2.0",
+    "fs": "^0.0.1-security",
     "node-sass": "^4.12.0",
     "sass-loader": "^8.0.2",
     "typescript": "~4.1.5",
-    "vue-template-compiler": "^2.6.11"
-  }
+    "vue-cli-plugin-electron-builder": "~2.0.0",
+    "vue-template-compiler": "^2.6.11",
+    "webpack-chain": "^6.5.1"
+  },
+  "__npminstall_done": false
 }
