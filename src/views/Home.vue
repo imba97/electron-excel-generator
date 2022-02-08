@@ -1,34 +1,51 @@
 <template>
   <div class="home">
-    <div id="smallCar" class="dropBox">
-      <p>小车</p>
-      <div class="drop"></div>
+    <div class="dropBox">
+      <div v-show="!loaded">
+        <p>拖拽到此处</p>
+        <div class="drop"></div>
+      </div>
+      <div v-show="loaded">
+        <p>读取成功</p>
+      </div>
     </div>
-    <div id="bigCar" class="dropBox">
-      <p>大车</p>
-      <div class="drop"></div>
+
+    <div v-show="loaded" class="control">
+      <div
+        class="download"
+        @click="generateNoResidenceInfoList"
+      >下载需要手动统计表格 {{ noResidenceInfoList.length }}</div>
+
+      <div class="download" @click="generateData">生成表格</div>
+      <div class="download" @click="back">返回</div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { Component, Vue } from 'vue-property-decorator';
-import xlsx from 'node-xlsx';
-import Car from '@/utils/car';
-import { getMonthByFilename, getDayByDate } from '@/utils/date';
-import _ from 'lodash';
+import { Component, Vue } from 'vue-property-decorator'
+import xlsx from 'node-xlsx'
+import Car from '@/utils/car'
+import { getMonthByFilename, getDayByDate } from '@/utils/date'
+import _ from 'lodash'
+import $ from 'jquery'
 
 import { ipcRenderer } from 'electron';
+import { IGenerateData, IOriginalData, ISheet } from '@/typings/excelColumn'
+import TransferPersonnel from '@/utils/transferPersonnel'
+import { generateData } from '@/enums/excelColumn'
 
 @Component({
   components: {}
 })
 export default class Home extends Vue {
-  public dropBoxStyle = {
-    backgroundColor: '#666'
-  };
 
-  private currentDropBox: HTMLElement;
+  public loaded = false
+
+  private currentDropBox: JQuery<HTMLElement>;
+
+  public list: IGenerateData[] = []
+  public noResidenceInfoList: any[] = []
 
   public mounted() {
     // test
@@ -56,8 +73,8 @@ export default class Home extends Vue {
   private onDrag(e: Event) {
     e.stopPropagation();
     e.preventDefault();
-    this.currentDropBox = (e.target as HTMLElement).parentElement;
-    this.currentDropBox.style.backgroundColor = '#F66';
+    this.currentDropBox = $(e.target).parents('.dropBox');
+    this.currentDropBox.css('background-color', '#F66')
   }
 
   private onDragover(e: Event) {
@@ -67,8 +84,8 @@ export default class Home extends Vue {
       (e.target as HTMLElement).getAttribute('class') !== null &&
       (e.target as HTMLElement).getAttribute('class').indexOf('drop') !== -1
     ) {
-      this.currentDropBox = (e.target as HTMLElement).parentElement;
-      (e.target as HTMLElement).parentElement.style.backgroundColor = '#F66';
+      this.currentDropBox = $(e.target).parents('.dropBox');
+      this.currentDropBox.css('background-color', '#F66')
     }
   }
 
@@ -79,24 +96,24 @@ export default class Home extends Vue {
     if (!this.currentDropBox) {
       return;
     }
-    this.currentDropBox.style.backgroundColor = '';
+    this.currentDropBox.css('background-color', '')
     this.currentDropBox = null;
   }
 
   private async onDrop(e: Event) {
     e.stopPropagation();
     e.preventDefault();
+
     if (
-      (e.target as HTMLElement).parentElement !== this.currentDropBox &&
+      $(e.target).parents('.dropBox')[0] !== this.currentDropBox[0] &&
       this.currentDropBox !== null
     ) {
-      this.currentDropBox.style.backgroundColor = '';
+      this.currentDropBox.css('background-color', '')
       this.currentDropBox = null;
       return;
     } else {
-      (e.target as HTMLElement).parentElement.style.backgroundColor = '';
+      this.currentDropBox.css('background-color', '')
     }
-    const carType = (e.target as HTMLElement).parentElement.getAttribute('id');
 
     const drag = e as DragEvent;
 
@@ -119,142 +136,191 @@ export default class Home extends Vue {
       // 如果是表格 读取
       const table = xlsx.parse(path);
 
-      // 构造汽车数据
-      _.forEach(table, (sheet) => {
-        const car = new Car(sheet, carType);
-      });
+      let list = []
+      let noResidenceInfoList = []
 
-      // 构造生成表格数据 簿
-      const dataSheet: any[][] = [
-        // 第一行数据
-        [
-          '车型', // 0
-          '车座', // 1
-          '车号', // 2
-          '期限', // 3
-          '里程', // 4
-          '金额', // 5
-          '升数', // 6
-          '合计', // 7 *
-          '期限', // 8
-          '里程', // 9
-          '金额', // 10
-          '升数' // 11
-        ]
-      ];
+      _.forEach(table, item => {
+        const instance = new TransferPersonnel(item.data)
+        list = _.concat(list, instance.getList())
+        noResidenceInfoList = _.concat(noResidenceInfoList, instance.getNoResidenceInfoList())
+      })
 
-      // 表格合并数据
-      const merges = [];
-      /**
-       * 当前车辆索引
-       */
-      let currentIndex = 0;
+      this.list = list
+      this.noResidenceInfoList = noResidenceInfoList
 
-      if (_.isEmpty(Car.carsInfo)) return;
+      this.loaded = true
 
-      _.forEach(Car.carsInfo, (carInfo, carName) => {
-        _.forEach(carInfo, (cars, carNumber) => {
-          let seatIdentical = 0;
-          // 座数相同的合计
-          const seatIdenticalTotal = {
-            date: 0,
-            mileage: 0,
-            price: 0,
-            liters: 0
-          };
-          _.forEach(cars, (car, index) => {
-            // 座数相同 + 1
-            ++seatIdentical;
-            // 索引 + 1
-            ++currentIndex;
-            // 座数相同的合计
-            seatIdenticalTotal.date += car.date;
-            seatIdenticalTotal.mileage += car.mileage;
-            seatIdenticalTotal.price += car.price;
-            seatIdenticalTotal.liters += car.liters;
-            // 一条数据
-            dataSheet.push([
-              car.name,
-              car.seat,
-              car.carNumber,
-              car.date,
-              car.mileage,
-              car.price,
-              car.liters,
-              null,
-              null,
-              null,
-              null,
-              null
-            ]);
-          });
-          // 座数相同车辆循环结束
-          // 设置合计 行数为当前索引 - 座数相同车辆数 + (座数相同车辆数 / 2) 向上取整
-          const seatIdenticalTotalIndex =
-            currentIndex - seatIdentical + Math.ceil(seatIdentical / 2);
-
-          // 数据
-          dataSheet[seatIdenticalTotalIndex][8] = parseFloat(
-            seatIdenticalTotal.date.toFixed(2)
-          );
-          dataSheet[seatIdenticalTotalIndex][9] = parseFloat(
-            seatIdenticalTotal.mileage.toFixed(2)
-          );
-          dataSheet[seatIdenticalTotalIndex][10] = parseFloat(
-            seatIdenticalTotal.price.toFixed(2)
-          );
-          dataSheet[seatIdenticalTotalIndex][11] = parseFloat(
-            seatIdenticalTotal.liters.toFixed(2)
-          );
-
-          // 构造合并信息
-          merges.push({
-            s: { c: 0, r: currentIndex - seatIdentical + 1 },
-            e: { c: 0, r: currentIndex }
-          });
-          merges.push({
-            s: { c: 1, r: currentIndex - seatIdentical + 1 },
-            e: { c: 1, r: currentIndex }
-          });
-        });
-        // 相同车名 循环结束
-      });
-
-      dataSheet.push([
-        null,
-        null,
-        null,
-        { t: 'n', f: `=SUM(D2:D${currentIndex + 1})` },
-        { t: 'n', f: `=SUM(E2:E${currentIndex + 1})` },
-        { t: 'n', f: `=SUM(F2:F${currentIndex + 1})` },
-        { t: 'n', f: `=SUM(G2:G${currentIndex + 1})` },
-        null,
-        { t: 'n', f: `=SUM(I2:I${currentIndex + 1})` },
-        { t: 'n', f: `=SUM(J2:J${currentIndex + 1})` },
-        { t: 'n', f: `=SUM(K2:K${currentIndex + 1})` },
-        { t: 'n', f: `=SUM(L2:L${currentIndex + 1})` }
-      ]);
-
-      // 合计 的合并数据 第8列 从开头到车辆数
-      merges.push({ s: { c: 7, r: 0 }, e: { c: 7, r: currentIndex } });
-      const sheetOptions = { '!merges': merges };
-
-      const buffer = xlsx.build([
-        {
-          name: 'sheet1',
-          data: dataSheet,
-          options: sheetOptions
-        }
-      ]);
-
-      const month = getMonthByFilename(filename);
-
-      // 清空数据
-      Car.carsInfo = {};
-      Car.total = 0;
-
-      ipcRenderer.send('saveFile', `${month}合计`, buffer);
     }
+  }
+
+  public generateData(data: IGenerateData[]) {
+    const sheetData: ISheet[] = []
+
+    _.forEach(this.list, item => {
+      const title = item.community
+      const index = _.findIndex(sheetData, { title })
+
+      if (~index) {
+        // 没有该单元 则添加
+        if (!_.has(sheetData[index].rooms, item.residenceInfo.unitNumber)) {
+          sheetData[index].rooms[item.residenceInfo.unitNumber] = {}
+        }
+
+        // 没有该房间号 则添加
+        if (!_.has(sheetData[index].rooms[item.residenceInfo.unitNumber], item.residenceInfo.roomNumber)) {
+          sheetData[index].rooms[item.residenceInfo.unitNumber][item.residenceInfo.roomNumber] = []
+        }
+
+        // 添加住户信息
+        sheetData[index].rooms[item.residenceInfo.unitNumber][item.residenceInfo.roomNumber].push({
+          name: item.name,
+          gender: item.gender,
+          idCard: item.idCard,
+          contact: item.contact,
+          remarks: item.remarks,
+        })
+
+      } else {
+        sheetData.push({
+          title,
+          rooms: {
+            [item.residenceInfo.unitNumber]: {
+              [item.residenceInfo.roomNumber]: [{
+                name: item.name,
+                gender: item.gender,
+                idCard: item.idCard,
+                contact: item.contact,
+                remarks: item.remarks,
+              }]
+            }
+          }
+        })
+      }
+    })
+
+    const excel: { name: string, sheet: { name: string; data: any[][]; options?: {} | undefined }[] }[] = []
+
+    _.forEach(sheetData, data => {
+
+      const commonLine: any[][] = [
+        // 第一行
+        [data.title],
+
+        // 表头
+        [
+          '姓名',
+          '性别',
+          '身份证',
+          '联系方式',
+          '单元',
+          '门牌号',
+          '备注'
+        ]
+      ]
+
+      const sheets = []
+
+      _.forEach(data.rooms, (unit, unitNumber) => {
+        let currentIndex = 0
+        // 每个单元一个 sheet
+        const sheet = [
+          ...commonLine
+        ]
+
+        // 表格合并数据
+        const merges = []
+        // 合并第一行
+        merges.push({
+          s: { c: 0, r: 0 },
+          e: { c: 6, r: 0 }
+        })
+
+        _.forEach(unit, (rooms, roomNumber) => {
+          // 房间号合并
+          merges.push({
+            s: { c: generateData.roomNumber, r: currentIndex + 2 },
+            e: { c: generateData.roomNumber, r: rooms.length + currentIndex + 1 }
+          })
+
+          _.forEach(rooms, room => {
+            sheet.push([
+              room.name,
+              room.gender,
+              room.idCard,
+              `${room.contact}`.trim(),
+              unitNumber,
+              roomNumber,
+              room.remarks
+            ])
+
+            currentIndex++
+          })
+        })
+
+        // 单元号合并
+        merges.push({
+          s: { c: generateData.unitNumber, r: 2 },
+          e: { c: generateData.unitNumber, r: currentIndex + 1 }
+        })
+
+        sheets.push({
+          name: `${data.title}-${unitNumber}`,
+          data: sheet,
+          options: {
+            '!merges': merges
+          }
+        })
+      })
+
+      excel.push({
+        name: data.title,
+        sheet: sheets
+      })
+    })
+
+    ipcRenderer.send('writeFile', excel);
+  }
+
+  generateNoResidenceInfoList() {
+    // 构造生成表格数据 簿
+    const sheet: Array<{ name: string; data: any[][]; options?: {} | undefined }> = [];
+
+    const sheetData = [
+      // 表头
+      [
+        '序号',
+        '所在区',
+        '隔离酒店',
+        '房号',
+        '入住时间',
+        '姓名',
+        '性别',
+        '身份证号',
+        '联系电话',
+        '拟居家街道',
+        '拟居家社区及小区',
+        '拟居家所在楼栋、单元、房间号',
+        '备注',
+        '解除隔离日期'
+      ],
+
+      ...this.noResidenceInfoList.map(item => item.map((val: string) => `${val}`))
+    ]
+
+    sheet.push({
+      name: '需要手动统计',
+      data: sheetData
+    })
+
+    const buffer = xlsx.build(sheet);
+
+    ipcRenderer.send('saveFile', '需要手动统计表格', buffer);
+  }
+
+  public back() {
+    this.loaded = false
+    this.list = []
+    this.noResidenceInfoList = []
   }
 }
 </script>
@@ -267,9 +333,12 @@ export default class Home extends Vue {
 
 .dropBox {
   position: absolute;
+  top: 0;
   left: 0;
   width: 80%;
   height: 40%;
+
+  background-color: #f0f0f0;
 
   .drop {
     position: absolute;
@@ -285,17 +354,40 @@ export default class Home extends Vue {
     position: absolute;
     left: 50%;
     top: 50%;
+    width: 100%;
     transform: translate(-50%, -50%);
-    font-size: 3rem;
+    font-size: 2rem;
     z-index: 1;
   }
 }
-#smallCar {
-  top: 0;
-  background-color: #9f9;
-}
-#bigCar {
-  top: 50%;
-  background-color: #99f;
+
+.control {
+  position: absolute;
+  top: 40%;
+  left: 0;
+
+  width: 80%;
+  height: 100px;
+  background-color: #ccc;
+
+  div {
+    width: 100%;
+    height: 50px;
+    line-height: 50px;
+    text-align: center;
+
+    font-size: 20px;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background-color: #666;
+      color: #fff;
+    }
+  }
+
+  .download {
+    background-color: #ccc;
+  }
 }
 </style>

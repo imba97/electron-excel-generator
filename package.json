@@ -17,17 +17,20 @@
     "core-js": "^3.6.5",
     "electron-store": "^8.0.0",
     "exceljs": "^4.2.1",
+    "jquery": "^3.6.0",
     "lodash": "^4.17.21",
     "node-xlsx": "^0.16.1",
     "vue": "^2.6.11",
     "vue-class-component": "^7.2.3",
     "vue-property-decorator": "^9.1.2",
     "vue-router": "^3.2.0",
-    "vuex": "^3.4.0"
+    "vuex": "^3.4.0",
+    "xlsx-style": "^0.8.13"
   },
   "devDependencies": {
     "@types/electron-devtools-installer": "^2.2.0",
-    "@types/lodash": "^4.14.169",
+    "@types/jquery": "^3.5.13",
+    "@types/lodash": "^4.14.178",
     "@types/node-xlsx": "^0.15.1",
     "@vue/cli-plugin-babel": "~4.5.0",
     "@vue/cli-plugin-router": "~4.5.0",
