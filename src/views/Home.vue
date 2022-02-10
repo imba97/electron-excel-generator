@@ -25,13 +25,11 @@
 <script lang="ts">
 import { Component, Vue } from 'vue-property-decorator'
 import xlsx from 'node-xlsx'
-import Car from '@/utils/car'
-import { getMonthByFilename, getDayByDate } from '@/utils/date'
 import _ from 'lodash'
 import $ from 'jquery'
 
 import { ipcRenderer } from 'electron';
-import { IGenerateData, IOriginalData, ISheet } from '@/typings/excelColumn'
+import { IGenerateData, ISheet } from '@/typings/excelColumn'
 import TransferPersonnel from '@/utils/transferPersonnel'
 import { generateData } from '@/enums/excelColumn'
 
@@ -49,8 +47,6 @@ export default class Home extends Vue {
 
   public mounted() {
     // test
-
-    Car.carsInfo = {};
 
     _.forEach(document.querySelectorAll('.drop'), (drop: Element | null) => {
       if (drop) {
@@ -125,9 +121,6 @@ export default class Home extends Vue {
     const files = drag.dataTransfer.files;
     for (let i = 0; i < files.length; i++) {
       const path = drag.dataTransfer.files.item(i)!.path;
-      const filename = drag.dataTransfer.files
-        .item(i)!
-        .name.replace(/\.xlsx?$/, '');
 
       if (!/\.xlsx?$/.test(path)) {
         return;
@@ -153,7 +146,7 @@ export default class Home extends Vue {
     }
   }
 
-  public generateData(data: IGenerateData[]) {
+  public generateData() {
     const sheetData: ISheet[] = []
 
     _.forEach(this.list, item => {
@@ -161,42 +154,53 @@ export default class Home extends Vue {
       const index = _.findIndex(sheetData, { title })
 
       if (~index) {
+        // 没有该楼号 则添加
+        if (!_.has(sheetData[index].building, item.residenceInfo.buildingNumber)) {
+          sheetData[index].building[item.residenceInfo.buildingNumber] = {}
+        }
+
         // 没有该单元 则添加
-        if (!_.has(sheetData[index].rooms, item.residenceInfo.unitNumber)) {
-          sheetData[index].rooms[item.residenceInfo.unitNumber] = {}
+        if (!_.has(sheetData[index].building[item.residenceInfo.buildingNumber], item.residenceInfo.unitNumber)) {
+          sheetData[index].building[item.residenceInfo.buildingNumber][item.residenceInfo.unitNumber] = {}
         }
 
         // 没有该房间号 则添加
-        if (!_.has(sheetData[index].rooms[item.residenceInfo.unitNumber], item.residenceInfo.roomNumber)) {
-          sheetData[index].rooms[item.residenceInfo.unitNumber][item.residenceInfo.roomNumber] = []
+        if (!_.has(sheetData[index].building[item.residenceInfo.buildingNumber][item.residenceInfo.unitNumber], item.residenceInfo.roomNumber)) {
+          sheetData[index].building[item.residenceInfo.buildingNumber][item.residenceInfo.unitNumber][item.residenceInfo.roomNumber] = []
         }
 
         // 添加住户信息
-        sheetData[index].rooms[item.residenceInfo.unitNumber][item.residenceInfo.roomNumber].push({
+        sheetData[index].building[item.residenceInfo.buildingNumber][item.residenceInfo.unitNumber][item.residenceInfo.roomNumber].push({
           name: item.name,
           gender: item.gender,
           idCard: item.idCard,
           contact: item.contact,
           remarks: item.remarks,
+          unitNumber: item.residenceInfo.unitNumber
         })
 
       } else {
         sheetData.push({
           title,
-          rooms: {
-            [item.residenceInfo.unitNumber]: {
-              [item.residenceInfo.roomNumber]: [{
-                name: item.name,
-                gender: item.gender,
-                idCard: item.idCard,
-                contact: item.contact,
-                remarks: item.remarks,
-              }]
+          building: {
+            [item.residenceInfo.buildingNumber]: {
+              [item.residenceInfo.unitNumber]: {
+                [item.residenceInfo.roomNumber]: [{
+                  name: item.name,
+                  gender: item.gender,
+                  idCard: item.idCard,
+                  contact: item.contact,
+                  remarks: item.remarks,
+                  unitNumber: item.residenceInfo.unitNumber
+                }]
+              }
             }
           }
         })
       }
     })
+
+    console.log(sheetData)
 
     const excel: { name: string, sheet: { name: string; data: any[][]; options?: {} | undefined }[] }[] = []
 
@@ -220,11 +224,13 @@ export default class Home extends Vue {
 
       const sheets = []
 
-      _.forEach(data.rooms, (unit, unitNumber) => {
+      _.forEach(data.building, (units, buildingNumber) => {
         let currentIndex = 0
-        // 每个单元一个 sheet
+
+        // 每个栋楼一个 sheet
         const sheet = [
-          ...commonLine
+          [`${commonLine[0][0]} ${buildingNumber}幢`],
+          commonLine[1]
         ]
 
         // 表格合并数据
@@ -235,36 +241,53 @@ export default class Home extends Vue {
           e: { c: 6, r: 0 }
         })
 
-        _.forEach(unit, (rooms, roomNumber) => {
-          // 房间号合并
-          merges.push({
-            s: { c: generateData.roomNumber, r: currentIndex + 2 },
-            e: { c: generateData.roomNumber, r: rooms.length + currentIndex + 1 }
+        // 单元
+        _.forEach(units, (unit, unitNumber) => {
+
+          // 合并单元
+          const countUnits = _.reduce(_.keys(unit), (result, unitKey) => {
+            result += unit[unitKey].length
+            return result
+          }, 0)
+
+          if (countUnits > 1) {
+            // 同一单元 大于1条数据的 单元合并
+            merges.push({
+              s: { c: generateData.unitNumber, r: currentIndex + 2 },
+              e: { c: generateData.unitNumber, r: countUnits + currentIndex + 1 }
+            })
+          }
+
+          // 房间
+          _.forEach(unit, (rooms, roomNumber) => {
+
+            if (rooms.length > 1) {
+              // 同一房间号 大于1条数据的 房间号合并
+              merges.push({
+                s: { c: generateData.roomNumber, r: currentIndex + 2 },
+                e: { c: generateData.roomNumber, r: rooms.length + currentIndex + 1 }
+              })
+            }
+
+            _.forEach(rooms, room => {
+              sheet.push([
+                room.name,
+                room.gender,
+                room.idCard,
+                `${room.contact}`.trim(),
+                unitNumber,
+                roomNumber,
+                room.remarks
+              ])
+
+              currentIndex++
+            })
+
           })
-
-          _.forEach(rooms, room => {
-            sheet.push([
-              room.name,
-              room.gender,
-              room.idCard,
-              `${room.contact}`.trim(),
-              unitNumber,
-              roomNumber,
-              room.remarks
-            ])
-
-            currentIndex++
-          })
-        })
-
-        // 单元号合并
-        merges.push({
-          s: { c: generateData.unitNumber, r: 2 },
-          e: { c: generateData.unitNumber, r: currentIndex + 1 }
         })
 
         sheets.push({
-          name: `${data.title}-${unitNumber}`,
+          name: `${data.title} ${buildingNumber}幢`,
           data: sheet,
           options: {
             '!merges': merges
@@ -277,6 +300,8 @@ export default class Home extends Vue {
         sheet: sheets
       })
     })
+
+    console.log(excel)
 
     ipcRenderer.send('writeFile', excel);
   }

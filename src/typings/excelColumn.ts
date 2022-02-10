@@ -136,40 +136,50 @@ export interface ISheet {
    */
   title: string
 
-  rooms: {
+  building: {
     /**
-     * 单元号
+     * 楼号
      */
     [key: string]: {
       /**
-       * 门牌号
+       * 单元号
        */
       [key: string]: {
         /**
-         * 姓名
+         * 门牌号
          */
-        name: string
+        [key: string]: {
+          /**
+           * 姓名
+           */
+          name: string
 
-        /**
-         * 性别
-         */
-        gender: string
+          /**
+           * 性别
+           */
+          gender: string
 
-        /**
-         * 身份证
-         */
-        idCard: string
+          /**
+           * 身份证
+           */
+          idCard: string
 
-        /**
-         * 联系方式
-         */
-        contact: string
+          /**
+           * 联系方式
+           */
+          contact: string
 
-        /**
-         * 备注
-         */
-        remarks: string
-      }[]
+          /**
+           * 单元号
+           */
+          unitNumber: string
+
+          /**
+           * 备注
+           */
+          remarks: string
+        }[]
+      }
     }
   }
 }

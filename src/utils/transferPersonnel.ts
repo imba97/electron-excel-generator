@@ -2,11 +2,7 @@
  * 蓝天救援队 疫情 转运人员统计
  */
 import { originalData } from '@/enums/excelColumn'
-import {
-  IGenerateData,
-  IOriginalData,
-  IResidenceInfo
-} from '@/typings/excelColumn'
+import { IGenerateData, IResidenceInfo } from '@/typings/excelColumn'
 import _ from 'lodash'
 
 export default class TransferPersonnel {
@@ -35,7 +31,7 @@ export default class TransferPersonnel {
           gender: item[originalData.gender],
           idCard: item[originalData.idCard],
           contact: item[originalData.contact],
-          community: item[originalData.community],
+          community: _.trim(item[originalData.community]),
           residenceInfo: residenceInfo,
           remarks: item[originalData.remarks] || ''
         })
@@ -66,12 +62,12 @@ export default class TransferPersonnel {
   private getResidenceInfo(residenceInfo: string): IResidenceInfo | null {
     // 楼号-单元号-房间号
     const case1 = /(\d+)(?:-|—|一)(\d+)(?:-|—|一)(\d+)/
-    // 楼号 房间号
-    const case2 = /(\d+)幢(\d+)室/
     // 楼号 单元号 房间号
-    const case3 = /(\d+)(?:幢|栋|号楼)(\d+)单元(\d+)室/
+    const case2 = /(\d+)(?:幢|栋|号楼)(\d+)单元(\d+)(?:室|号)?/
+    // 楼号 房间号
+    const case3 = /(\d+)(?:幢|栋)(\d+)室?/
     // 楼号-房间号
-    const case4 = /[^-—]?(\d+)(?:-|—)(\d+)[^-—]?/
+    const case4 = /(\d+)(?:-|—)(\d+)/
 
     if (case1.test(residenceInfo)) {
       const residenceInfoReg = case1.exec(residenceInfo)
@@ -86,23 +82,23 @@ export default class TransferPersonnel {
 
       return {
         buildingNumber: residenceInfoReg[1],
-        unitNumber: '未知',
-        roomNumber: residenceInfoReg[2]
+        unitNumber: residenceInfoReg[2],
+        roomNumber: residenceInfoReg[3]
       }
     } else if (case3.test(residenceInfo)) {
       const residenceInfoReg = case3.exec(residenceInfo)
 
       return {
         buildingNumber: residenceInfoReg[1],
-        unitNumber: residenceInfoReg[2],
-        roomNumber: residenceInfoReg[3]
+        unitNumber: '1',
+        roomNumber: residenceInfoReg[2]
       }
     } else if (case4.test(residenceInfo)) {
       const residenceInfoReg = case4.exec(residenceInfo)
 
       return {
         buildingNumber: residenceInfoReg[1],
-        unitNumber: '未知',
+        unitNumber: '1',
         roomNumber: residenceInfoReg[2]
       }
     }
