@@ -104,18 +104,3 @@ export default class TransferPersonnel {
     }
   }
 }
-
-/**
- * 转运人员数据类型
- */
-export enum transferPersonnelType {
-  /**
-   * 区内
-   */
-  inner,
-
-  /**
-   * 区外
-   */
-  external
-}

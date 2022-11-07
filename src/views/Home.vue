@@ -1,3 +1,70 @@
+<style scoped lang="scss">
+* {
+  margin: 0;
+  padding: 0;
+}
+
+.dropBox {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 80%;
+  height: 40%;
+
+  background-color: #f0f0f0;
+
+  .drop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    z-index: 10;
+  }
+
+  p {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 100%;
+    transform: translate(-50%, -50%);
+    font-size: 2rem;
+    z-index: 1;
+  }
+}
+
+.control {
+  position: absolute;
+  top: 40%;
+  left: 0;
+
+  width: 80%;
+  height: 100px;
+  background-color: #ccc;
+
+  div {
+    width: 100%;
+    height: 50px;
+    line-height: 50px;
+    text-align: center;
+
+    font-size: 20px;
+    cursor: pointer;
+    user-select: none;
+
+    &:hover {
+      background-color: #666;
+      color: #fff;
+    }
+  }
+
+  .button {
+    background-color: #ccc;
+  }
+}
+</style>
+
 <template>
   <div class="home">
     <div class="dropBox">
@@ -12,12 +79,12 @@
 
     <div v-show="loaded" class="control">
       <div
-        class="download"
+        class="button"
         @click="generateNoResidenceInfoList"
       >下载需要手动统计表格 {{ noResidenceInfoList.length }}</div>
 
-      <div class="download" @click="generateData">生成表格</div>
-      <div class="download" @click="back">返回</div>
+      <div class="button" @click="generateData">生成表格</div>
+      <div class="button" @click="back">返回</div>
     </div>
   </div>
 </template>
@@ -122,6 +189,12 @@ export default class Home extends Vue {
     for (let i = 0; i < files.length; i++) {
       const path = drag.dataTransfer.files.item(i)!.path;
 
+      if (/read$/.test(path)) {
+        console.log('文件夹')
+        ipcRenderer.send('generateExcel', path)
+        return
+      }
+
       if (!/\.xlsx?$/.test(path)) {
         return;
       }
@@ -199,8 +272,6 @@ export default class Home extends Vue {
         })
       }
     })
-
-    console.log(sheetData)
 
     const excel: { name: string, sheet: { name: string; data: any[][]; options?: {} | undefined }[] }[] = []
 
@@ -301,8 +372,6 @@ export default class Home extends Vue {
       })
     })
 
-    console.log(excel)
-
     ipcRenderer.send('writeFile', excel);
   }
 
@@ -349,70 +418,3 @@ export default class Home extends Vue {
   }
 }
 </script>
-
-<style scoped lang="scss">
-* {
-  margin: 0;
-  padding: 0;
-}
-
-.dropBox {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 80%;
-  height: 40%;
-
-  background-color: #f0f0f0;
-
-  .drop {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    opacity: 0;
-    z-index: 10;
-  }
-
-  p {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    width: 100%;
-    transform: translate(-50%, -50%);
-    font-size: 2rem;
-    z-index: 1;
-  }
-}
-
-.control {
-  position: absolute;
-  top: 40%;
-  left: 0;
-
-  width: 80%;
-  height: 100px;
-  background-color: #ccc;
-
-  div {
-    width: 100%;
-    height: 50px;
-    line-height: 50px;
-    text-align: center;
-
-    font-size: 20px;
-    cursor: pointer;
-    user-select: none;
-
-    &:hover {
-      background-color: #666;
-      color: #fff;
-    }
-  }
-
-  .download {
-    background-color: #ccc;
-  }
-}
-</style>
